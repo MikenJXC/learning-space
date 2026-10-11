@@ -11,6 +11,7 @@ import { PdfViewer } from "@/components/pdf-viewer";
 import { useWheelPaging } from "@/lib/use-wheel-paging";
 import { downloadUrl } from "@/lib/download-url";
 import { createSlideImage, getSlideFitScale, repairMissingSlideShapes, SLIDE_FRAME_DOCUMENT, SLIDE_WIDTH } from "@/lib/slide-frame";
+import { preparePptxPreview } from "@/lib/pptx-compat";
 
 export function DocumentViewer({ asset, variant }: { asset: LibraryAsset; variant: "dark" | "light" }) {
   const t = useT();
@@ -61,6 +62,7 @@ function PptxViewer({ asset }: { asset: LibraryAsset }) {
   const [viewport, setViewport] = useState({ width: 0, height: 0 });
   const [manualScale, setManualScale] = useState<number | null>(null);
   const [slideImage, setSlideImage] = useState("");
+  const [incompletePreview, setIncompletePreview] = useState(false);
   const [saveStatus, setSaveStatus] = useState(t("自动记录阅读位置"));
   const saveSequence = useRef(0);
   const baseWidth = SLIDE_WIDTH;
@@ -108,7 +110,15 @@ function PptxViewer({ asset }: { asset: LibraryAsset }) {
         host.innerHTML = "";
         // Load without the library's fixed-height, internally scrolling slide frame.
         previewer = module.init(host, { width: baseWidth, mode: "list" });
-        const deck = await previewer.load(buffer);
+        const compatible = await preparePptxPreview(buffer);
+        if (cancelled) return;
+        setIncompletePreview(compatible.incomplete);
+        const deck = await previewer.load(compatible.buffer);
+        // pptx-preview labels all media image/*; SVG requires its actual MIME
+        // type in Chromium/WebKit rather than relying on bitmap sniffing.
+        for (const [name, data] of Object.entries(deck.medias)) {
+          if (name.toLowerCase().endsWith(".svg")) deck.medias[name] = data.replace(/^data:image\/\*;/, "data:image/svg+xml;");
+        }
         if (cancelled) return;
         if (!deck.slides.length || deck.width <= 0 || deck.height <= 0) throw new Error(t("PPT 中没有可阅读的页面"));
         for (const slide of deck.slides) repairMissingSlideShapes(slide.nodes);
@@ -207,6 +217,7 @@ function PptxViewer({ asset }: { asset: LibraryAsset }) {
           <Button variant="ghost" size="sm" disabled={!ready} onClick={() => { setManualScale(null); viewportRef.current?.scrollTo({ top: 0, left: 0 }); }} className="min-h-11 px-2 text-slate-200 hover:bg-white/10 hover:text-white"><Maximize />{t("适合窗口")}</Button>
         </div>
       </div>
+      {incompletePreview && <div role="alert" className="shrink-0 border-b border-amber-400/20 bg-amber-400/10 px-4 py-2 text-xs text-amber-200">{t("本课件部分公式或图片可能无法完整预览，请下载原文件核对")}</div>}
       <div ref={viewportRef} tabIndex={0} aria-label={t("PPT 页面")} className="relative min-h-0 flex-1 overflow-auto overscroll-contain outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-400"
         onKeyDown={(event) => {
           if (event.key === "ArrowRight" && ready) { event.preventDefault(); changePage(page + 1); }

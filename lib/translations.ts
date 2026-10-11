@@ -66,6 +66,7 @@ export const english: Record<string, string> = {
   "PPT 中没有可阅读的页面": "This presentation has no readable slides", "PPT 预览失败": "Slide preview failed", "预览尚未就绪": "The preview is not ready yet",
   "此页预览失败，请下载原文件阅读": "This page could not be previewed. Please download the original file.",
   "此页图像预览失败，请下载原文件阅读": "This slide image could not be displayed. Please download the original file.",
+  "本课件部分公式或图片可能无法完整预览，请下载原文件核对": "Some equations or images in this presentation may not preview completely. Please check the original file.",
   "PDF 读取失败": "Could not load the PDF", "PDF 预览失败": "PDF preview failed", "PDF 页面预览失败": "Could not preview this PDF page",
   "有 {0} 个文件未能识别，已跳过。": "Skipped {0} files with unrecognized folder names.", "正在创建课程：{0}": "Creating course: {0}",
   "课程“{0}”创建失败": "Could not create course “{0}”", "找不到课程“{0}”": "Course “{0}” was not found",

@@ -19,6 +19,11 @@ export function createSlideImage(host: HTMLElement, height: number): string {
   clone.style.width = `${SLIDE_WIDTH}px`;
   clone.style.height = `${height}px`;
   clone.setAttribute("xmlns", "http://www.w3.org/1999/xhtml");
+  // Some decks reserve an inline equation's position using leading spaces.
+  // HTML collapsing those spaces makes the neighboring caption overlap it.
+  clone.querySelectorAll<HTMLElement>("p").forEach((node) => {
+    node.style.whiteSpace = /^[ \t]{2,}\S/.test(node.textContent ?? "") ? "pre" : "pre-wrap";
+  });
   // Image previews must remain inert, including hyperlinks in uploaded files.
   clone.querySelectorAll("script, iframe, object, embed").forEach((node) => node.remove());
   clone.querySelectorAll("*").forEach((node) => {
@@ -37,6 +42,8 @@ type SlideNode = {
   textBody?: {
     props?: { anchor?: string };
     inheritProps?: { anchor?: string };
+    source?: { "a:p"?: unknown };
+    paragraphs?: { props: { spaceBefore?: number; spaceAfter?: number }; rows?: { props?: { size?: number } }[]; endParaRProps?: { size?: number }; inheritRProps?: { size?: number } }[];
   };
   nodes?: SlideNode[];
 };
@@ -50,6 +57,19 @@ export function repairMissingSlideShapes(nodes: SlideNode[]): void {
     if (node.textBody && !node.textBody.props?.anchor && !node.textBody.inheritProps?.anchor) {
       node.textBody.props = { ...node.textBody.props, anchor: "t" };
     }
+    // Percentage paragraph spacing is ignored by pptx-preview. It matters
+    // when a separately positioned equation sits beside the next text line.
+    const sourceParagraphs = node.textBody?.source?.["a:p"];
+    const rawParagraphs = Array.isArray(sourceParagraphs) ? sourceParagraphs : sourceParagraphs ? [sourceParagraphs] : [];
+    node.textBody?.paragraphs?.forEach((paragraph, index) => {
+      const raw = rawParagraphs[index] as { "a:pPr"?: Record<string, { "a:spcPct"?: { attrs?: { val?: string } } }> } | undefined;
+      const fontSize = Math.max(0, paragraph.endParaRProps?.size ?? 0, paragraph.inheritRProps?.size ?? 0, ...(paragraph.rows ?? []).map((row) => row.props?.size ?? 0));
+      if (!fontSize) return;
+      for (const [element, property] of [["a:spcBef", "spaceBefore"], ["a:spcAft", "spaceAfter"]] as const) {
+        const percent = Number(raw?.["a:pPr"]?.[element]?.["a:spcPct"]?.attrs?.val);
+        if (Number.isFinite(percent) && percent >= 0) paragraph.props[property] = fontSize * percent / 100000;
+      }
+    });
     // The renderer skips the fill entirely when an ordinary filled text box
     // has no explicit geometry. Preserve its own fill; never invent a color.
     if (!node.shape && "textBody" in node && node.background?.type && node.background.type !== "none") {

@@ -1,0 +1,22 @@
+import assert from "node:assert/strict";
+import { metafileSize, decodeSymbolText, wmfTextStyles } from "../lib/pptx-compat.ts";
+
+assert.equal(decodeSymbolText("abq\u00b3\u00b4\u00a5"), "αβθ≥×∞");
+assert.equal(decodeSymbolText("\uf061\uf06c\uf0ec\uf0ed\uf0ee"), "αλ⎧⎨⎩");
+assert.equal(decodeSymbolText("\uf0f2\uf0b6\uf0e5\uf0d6"), "∫∂∑√");
+assert.equal(decodeSymbolText("\uf046=R and Rt", true), "Φ=R and Rt");
+assert.equal(decodeSymbolText("Rt", true), "Rt");
+const placeable = new ArrayBuffer(46);
+const view = new DataView(placeable);
+view.setUint32(0,0x9ac6cdd7,true);
+view.setInt16(6,-20,true); view.setInt16(8,-10,true); view.setInt16(10,980,true); view.setInt16(12,190,true);
+view.setUint32(40,3,true); view.setUint16(44,0,true);
+assert.deepEqual(metafileSize(placeable,"wmf"),{width:1000,height:200});
+assert.deepEqual(wmfTextStyles(placeable),[]);
+const emf = new ArrayBuffer(40); const emfView = new DataView(emf);
+emfView.setUint32(0,1,true); emfView.setInt32(8,10,true); emfView.setInt32(12,20,true); emfView.setInt32(16,110,true); emfView.setInt32(20,70,true);
+assert.deepEqual(metafileSize(emf,"emf"),{width:100,height:50});
+assert.throws(()=>metafileSize(new ArrayBuffer(18),"wmf"));
+assert.throws(()=>wmfTextStyles(new ArrayBuffer(30)),/Invalid WMF record/);
+assert.throws(()=>metafileSize(new ArrayBuffer(9*1024*1024),"wmf"));
+console.log("PPT compatibility checks passed: Symbol/private-use glyphs, WMF/EMF geometry, malformed records and size bounds.");
