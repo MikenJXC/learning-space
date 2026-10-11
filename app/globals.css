@@ -1,0 +1,164 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "../vendor/shadcn-tailwind-4.13.0.css";
+
+@utility scrollbar-thin {
+  scrollbar-width: thin;
+}
+
+@utility scrollbar-none {
+  scrollbar-width: none;
+
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+@utility scrollbar-gutter-stable {
+  scrollbar-gutter: stable;
+}
+
+:root {
+  --background: #f4f7fb;
+  --foreground: #0f172a;
+  --card: #ffffff;
+  --card-foreground: #171717;
+  --popover: #ffffff;
+  --popover-foreground: #171717;
+  --primary: #155eef;
+  --primary-foreground: #ffffff;
+  --secondary: #f5f5f5;
+  --secondary-foreground: #171717;
+  --muted: #f5f5f5;
+  --muted-foreground: #737373;
+  --accent: #f5f5f5;
+  --accent-foreground: #171717;
+  --destructive: #e7000b;
+  --border: #e5e5e5;
+  --input: #e5e5e5;
+  --ring: #155eef;
+  --chart-1: #f54900;
+  --chart-2: #009689;
+  --chart-3: #104e64;
+  --chart-4: #ffb900;
+  --chart-5: #fe9a00;
+  --radius: 0.875rem;
+  --sidebar: #fafafa;
+  --sidebar-foreground: #171717;
+  --sidebar-primary: #155eef;
+  --sidebar-primary-foreground: #fafafa;
+  --sidebar-accent: #f5f5f5;
+  --sidebar-accent-foreground: #171717;
+  --sidebar-border: #e5e5e5;
+  --sidebar-ring: #a1a1a1;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --font-sans: "Inter", "SF Pro Display", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+    "Liberation Mono", "Courier New", monospace;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+  min-width: 320px;
+}
+
+.pptx-stage > div {
+  margin-inline: auto;
+}
+
+/* Slides are a fixed-coordinate document, not responsive body text. Mobile
+   text inflation would reflow text boxes before the whole slide is scaled. */
+.pptx-stage,
+.pptx-stage * {
+  -webkit-text-size-adjust: none;
+  text-size-adjust: none;
+}
+
+/* Horizontal overflow belongs to the matrix, not the page. */
+@media (hover: hover) and (pointer: fine) {
+  .matrix-scroll { cursor: grab; user-select: none; }
+}
+.matrix-scroll[data-dragging="true"], .matrix-scroll[data-dragging="true"] * {
+  cursor: grabbing !important;
+  user-select: none;
+}
+.course-matrix {
+  --course-column-width: 112px;
+  --chapter-column-width: 184px;
+  width: calc(var(--course-column-width) + var(--chapter-column-width) * var(--chapter-count));
+}
+.matrix-course-column { width: var(--course-column-width); }
+.matrix-chapter-column { width: var(--chapter-column-width); }
+[data-slot="select-trigger"] { min-width: 0; }
+[data-slot="select-value"] { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+[data-slot="select-content"] { max-width: calc(100vw - 24px); }
+[data-slot="select-item"] > span:last-child { min-width: 0; white-space: normal; overflow-wrap: anywhere; }
+
+@media (max-width: 767px) {
+  /* Avoid iOS auto-zoom when focusing a form field. */
+  input, select, textarea { font-size: 16px !important; }
+  [data-slot="dialog-content"] button { min-height: 44px; }
+  [data-slot="dialog-content"] [data-slot="select-trigger"] { min-height: 44px; }
+}
+@media (min-width: 640px) {
+  .course-matrix { --course-column-width: 224px; --chapter-column-width: 224px; }
+}
+@media (max-width: 767px), (pointer: coarse) and (max-height: 500px) and (max-width: 1023px) {
+  .desktop-reading-only { display: none; }
+  .course-matrix { --course-column-width: 112px; --chapter-column-width: 184px; }
+  .course-matrix th[scope="row"], .course-matrix th[scope="col"]:first-child { padding-inline: 12px; }
+}
+.study-shell { padding-bottom: env(safe-area-inset-bottom); }
+.study-header { padding-top: max(8px, env(safe-area-inset-top)); }
+@media (max-height: 500px) and (orientation: landscape) {
+  .study-header-inner { display: flex; flex-wrap: nowrap; gap: 6px; }
+  .study-course-select { width: min(22vw, 240px); }
+  .study-chapter-select { width: 88px; }
+  .study-view-modes { width: auto; margin-left: auto; }
+  .study-view-modes button { flex: initial; }
+  .study-section { padding: 6px; }
+  .study-file-selectors { margin-bottom: 6px; }
+  .study-asset-select { display: flex; align-items: center; gap: 8px; padding-block: 0; }
+  .study-asset-select p { flex-shrink: 0; margin-bottom: 0; }
+  .study-asset-select [data-slot="select-trigger"] { flex: 1; }
+  .viewer-label { height: 24px; }
+}
