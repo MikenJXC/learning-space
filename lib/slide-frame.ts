@@ -34,12 +34,22 @@ export function createSlideImage(host: HTMLElement, height: number): string {
 type SlideNode = {
   shape?: string;
   background?: { type?: string };
-  textBody?: unknown;
+  textBody?: {
+    props?: { anchor?: string };
+    inheritProps?: { anchor?: string };
+  };
   nodes?: SlideNode[];
 };
 
 export function repairMissingSlideShapes(nodes: SlideNode[]): void {
   for (const node of nodes) {
+    // DrawingML's default body anchor is top. pptx-preview instead centers
+    // non-textbox placeholders when the attribute is absent, moving a short
+    // heading into the middle of its large placeholder and behind pictures.
+    // Keep explicit and inherited anchors (especially ctr/b) unchanged.
+    if (node.textBody && !node.textBody.props?.anchor && !node.textBody.inheritProps?.anchor) {
+      node.textBody.props = { ...node.textBody.props, anchor: "t" };
+    }
     // The renderer skips the fill entirely when an ordinary filled text box
     // has no explicit geometry. Preserve its own fill; never invent a color.
     if (!node.shape && "textBody" in node && node.background?.type && node.background.type !== "none") {

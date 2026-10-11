@@ -10,6 +10,21 @@ assert.equal(missing.shape, "rect");
 assert.equal(transparent.shape, undefined);
 assert.equal(ellipse.shape, "ellipse");
 assert.equal(picture.shape, undefined);
+// A short heading in a tall body placeholder must not be vertically centered.
+const defaultAnchor = { textBody: { props: {}, inheritProps: {} } };
+const noProps = { textBody: {} };
+const centered = { textBody: { props: { anchor: "ctr" } } };
+const bottom = { textBody: { props: { anchor: "b" } } };
+const inheritedCenter = { textBody: { props: {}, inheritProps: { anchor: "ctr" } } };
+const explicitTop = { textBody: { props: { anchor: "t" }, inheritProps: { anchor: "ctr" } } };
+repairMissingSlideShapes([{ nodes: [defaultAnchor, noProps, centered, bottom, inheritedCenter, explicitTop] }]);
+assert.equal(defaultAnchor.textBody.props.anchor, "t");
+assert.equal(noProps.textBody.props.anchor, "t");
+assert.equal(centered.textBody.props.anchor, "ctr");
+assert.equal(bottom.textBody.props.anchor, "b");
+assert.equal(inheritedCenter.textBody.props.anchor, undefined);
+assert.equal(inheritedCenter.textBody.inheritProps.anchor, "ctr");
+assert.equal(explicitTop.textBody.props.anchor, "t");
 assert.ok(SLIDE_FRAME_DOCUMENT.includes(`width=${SLIDE_WIDTH}`));
 assert.ok(SLIDE_FRAME_DOCUMENT.includes("text-size-adjust:none!important"));
 assert.ok(SLIDE_FRAME_DOCUMENT.includes("script-src 'none'"));
@@ -21,4 +36,4 @@ for (const [width, height] of [[320, 300], [360, 500], [390, 600], [430, 650], [
     assert.ok(slideHeight * scale <= height - 32 + 0.001);
   }
 }
-console.log("Slide frame checks passed: missing fill geometry restored, existing shapes unchanged, scripts blocked.");
+console.log("Slide frame checks passed: default top anchoring restored, explicit/inherited anchors preserved, missing fills restored, responsive fits and script isolation verified.");
