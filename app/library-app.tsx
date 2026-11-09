@@ -2,7 +2,7 @@
 import { useT } from "@/lib/i18n";
 
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
-import { BookOpen, ChevronLeft, ChevronRight, FileText, Grid3X3, Plus, Presentation, RotateCcw, Trash2, Upload } from "lucide-react";
+import { BookOpen, ChevronLeft, ChevronRight, FileText, Grid3X3, Plus, Presentation, RotateCcw, Trash2, Upload, X, TrendingUp } from "lucide-react";
 import { AccountActions } from "@/components/account-actions";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -11,8 +11,10 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { LibraryCourse, LibraryResponse } from "@/lib/library-types";
 import { getReadingProgress } from "@/lib/reading-progress";
+import { courseProgress, readingPercent } from "@/lib/course-progress";
 import { useMobileEdition } from "@/lib/use-mobile-edition";
 import { useHorizontalDrag } from "@/lib/use-horizontal-drag";
+import { mergeUploadFiles } from "@/lib/study-files";
 
 type Props = { displayName: string };
 
@@ -28,6 +30,7 @@ export function LibraryApp({ displayName }: Props) {
   const [courseId, setCourseId] = useState("");
   const [chapterNumber, setChapterNumber] = useState(1);
   const [saving, setSaving] = useState(false);
+  const [studyUploads, setStudyUploads] = useState<File[]>([]);
   const [chapterStart, setChapterStart] = useState(1);
   const [chapterJump, setChapterJump] = useState("1");
   const [deletingCourse, setDeletingCourse] = useState<LibraryCourse | null>(null);
@@ -75,6 +78,7 @@ export function LibraryApp({ displayName }: Props) {
     }
     setCourseId(nextCourseId || courses[0].id);
     setChapterNumber(nextChapter ?? 1);
+    setStudyUploads([]);
     setUploadDialogOpen(true);
   }
 
@@ -137,6 +141,7 @@ export function LibraryApp({ displayName }: Props) {
       await loadLibrary();
       setCourseId(data.course.id);
       setChapterNumber(1);
+      setStudyUploads([]);
       setUploadDialogOpen(true);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : t("课程创建失败"));
@@ -153,6 +158,7 @@ export function LibraryApp({ displayName }: Props) {
     data.set("courseId", courseId);
     data.set("chapterNumber", String(chapterNumber));
     data.set("createEmptyChapter", "true");
+    for (const file of studyUploads) data.append("study", file);
     setSaving(true);
     setError("");
     try {
@@ -161,6 +167,7 @@ export function LibraryApp({ displayName }: Props) {
       if (!response.ok) throw new Error(result.error || t("上传失败"));
       setUploadDialogOpen(false);
       form.reset();
+      setStudyUploads([]);
       await loadLibrary();
       if (chapterNumber > 0) setChapterStart(Math.floor((chapterNumber - 1) / rangeSize) * rangeSize + 1);
     } catch (cause) {
@@ -198,6 +205,7 @@ export function LibraryApp({ displayName }: Props) {
           <div className="flex flex-wrap gap-2">
             <Button className="min-h-11 flex-1 sm:flex-none" variant="outline" onClick={() => setCourseDialogOpen(true)}><Plus />{t("新建课程")}</Button>
             <Button className="min-h-11 flex-1 bg-[#155EEF] hover:bg-[#0F4FD6] sm:flex-none" onClick={() => openUpload()}><Upload />{t("上传章节")}</Button>
+            <Button asChild className="min-h-11 flex-1 sm:flex-none" variant="outline"><a href="/effort"><TrendingUp />{t("努力成果")}</a></Button>
             <Button className="min-h-11 flex-1 sm:flex-none" variant="ghost" onClick={() => void openDeletedCourses()}><RotateCcw />{t("已删除课程")}</Button>
           </div>
         </div>
@@ -247,9 +255,7 @@ export function LibraryApp({ displayName }: Props) {
                         const slideFiles = chapter?.assets.filter((asset) => asset.kind === "slides") ?? [];
                         const studyFiles = chapter?.assets.filter((asset) => asset.kind === "study") ?? [];
                         const firstFile = slideFiles[0] ?? studyFiles[0];
-                        const lastRead = chapter?.assets.filter((asset) => asset.progress)
-                          .sort((a, b) => (b.progress?.updatedAt ?? 0) - (a.progress?.updatedAt ?? 0))[0];
-                        const progress = lastRead?.progress;
+                        const { basis, files: progressFiles, lastRead, progress } = courseProgress(course, chapter);
                         return (
                           <td key={number} className="border-b border-slate-200 p-2 align-middle sm:p-3">
                             {chapter && firstFile ? (
@@ -258,11 +264,13 @@ export function LibraryApp({ displayName }: Props) {
                                   <div className="mb-2 flex items-center justify-between"><Presentation className="size-5 text-[#155EEF]" /><span className="rounded-full bg-white px-2 py-1 text-[11px] font-medium text-slate-500">{t("可阅读")}</span></div>
                                   <p className="truncate text-sm font-semibold" title={firstFile.fileName}>{firstFile.fileName}</p>
                                   <p className="mt-1 flex items-center gap-1 text-xs text-slate-500"><FileText className="size-3" />{slideFiles.length + studyFiles.length}{t(" 份文件")}</p>
+                                  {studyFiles.length > 0 && <p className="mt-1 text-[11px] text-slate-500">{t("{0} 份学习文档", {"0":studyFiles.length})}</p>}
                                   {progress ? <div className="mt-3" title={t("上次阅读：{0}", {"0":(lastRead?.fileName)})}>
-                                    <p className="text-xs font-medium text-[#155EEF]">{t("读到第 {0} / {1} 页", {"0":progress.page,"1":progress.totalPages})}</p>
+                                    <p className="mb-1 text-[11px] text-slate-500">{basis === "study" ? t("依据学习文档") : t("依据PPT")}</p>
+                                    <p className="text-xs font-medium text-[#155EEF]">{lastRead?.fileName.toLowerCase().endsWith(".docx") ? t("已阅读 {0}%", {"0":readingPercent(progress.page, progress.totalPages, lastRead.fileName)}) : t("读到第 {0} / {1} 页", {"0":progress.page,"1":progress.totalPages})}</p>
                                     {chapter.assets.length > 1 && <p className="mt-1 truncate text-[11px] text-slate-500">{lastRead?.fileName}</p>}
-                                    <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-blue-100"><div className="h-full rounded-full bg-[#155EEF]" style={{ width: `${Math.min(100, progress.page / progress.totalPages * 100)}%` }} /></div>
-                                  </div> : <p className="mt-2 text-xs text-slate-400">{t("尚未阅读")}</p>}
+                                    <div role="progressbar" aria-label={basis === "study" ? t("学习文档阅读进度") : t("PPT阅读进度")} aria-valuemin={0} aria-valuemax={100} aria-valuenow={readingPercent(progress.page, progress.totalPages, lastRead?.fileName ?? "")} className="mt-1.5 h-1 overflow-hidden rounded-full bg-blue-100"><div className="h-full rounded-full bg-[#155EEF]" style={{ width: `${readingPercent(progress.page, progress.totalPages, lastRead?.fileName ?? "")}%` }} /></div>
+                                  </div> : <div className="mt-2 text-xs text-slate-400"><p>{basis === "study" ? t("依据学习文档") : t("依据PPT")}</p><p className="mt-1">{progressFiles.length ? t("尚未阅读") : basis === "study" ? t("暂无学习文档") : t("暂无PPT课件")}</p></div>}
                                 </a>
                                 <button type="button" onClick={() => openUpload(course.id, number)} className="mt-2 min-h-11 w-full rounded-lg px-2 py-2 text-xs font-medium text-[#155EEF] hover:bg-white">{t("更新资料")}</button>
                               </div>
@@ -306,7 +314,7 @@ export function LibraryApp({ displayName }: Props) {
         </form></DialogContent>
       </Dialog>
 
-      <Dialog open={uploadDialogOpen} onOpenChange={setUploadDialogOpen}>
+      <Dialog open={uploadDialogOpen} onOpenChange={open => { if (!saving) setUploadDialogOpen(open); }}>
         <DialogContent className="rounded-3xl sm:max-w-xl"><form onSubmit={uploadChapter}>
           <DialogHeader><DialogTitle>{editingChapter ? t("补充章节资料") : t("增加章节 / 上传资料")}</DialogTitle><DialogDescription>{t("章节编号可继续增加，例如 10、20；不选文件也可先创建空章节。同一栏可上传多份 PDF、PPTX、DOCX，现有文件会保留。")}</DialogDescription></DialogHeader>
           {error && <p role="alert" className="mt-3 text-sm text-red-600">{t(error)}</p>}
@@ -314,9 +322,16 @@ export function LibraryApp({ displayName }: Props) {
             <div className="grid gap-2"><Label>{t("课程")}</Label><Select value={courseId} onValueChange={setCourseId}><SelectTrigger className="w-full"><SelectValue placeholder={t("选择课程")} /></SelectTrigger><SelectContent>{courses.map((course) => <SelectItem key={course.id} value={course.id}>{course.name}</SelectItem>)}</SelectContent></Select></div>
             <div className="grid gap-2"><Label htmlFor="chapter-number">{t("章节（0 代表课程资料，无固定章数上限）")}</Label><Input id="chapter-number" type="number" required min={0} step={1} value={chapterNumber} onChange={(event) => setChapterNumber(Number(event.target.value))} /></div>
             <div className="grid gap-2"><Label htmlFor="slides-file">{t("PPT / 课件")}</Label><Input id="slides-file" name="slides" type="file" accept=".pdf,.pptx,.docx" multiple className="h-auto py-2.5" /></div>
-            <div className="grid gap-2"><Label htmlFor="study-file">{t("学习文档 / 补充资料（可选）")}</Label><Input id="study-file" name="study" type="file" accept=".pdf,.pptx,.docx" multiple className="h-auto py-2.5" /></div>
+            <div className="grid gap-2">
+              <Label htmlFor="study-file">{t("学习文档 / 补充资料（可选，可多选）")}</Label>
+              <p id="study-upload-hint" className="text-xs leading-5 text-slate-500">{t("可一次选择多份文件，也可分次继续添加。保存时追加到本单元格，不覆盖已有文档。")}</p>
+              <Input id="study-file" type="file" accept=".pdf,.pptx,.docx" multiple disabled={saving} aria-describedby="study-upload-hint" className="h-auto py-2.5" onChange={event => { const incoming = Array.from(event.target.files ?? []); setStudyUploads(files => mergeUploadFiles(files, incoming)); event.target.value = ""; }} />
+              <p role="status" className="text-xs font-medium text-[#155EEF]">{t("已选 {0} 份学习文档", {"0":studyUploads.length})}</p>
+              {studyUploads.length > 0 && <ul aria-label={t("待上传学习文档")} className="max-h-48 overflow-y-auto rounded-xl border border-blue-100 bg-blue-50/50 px-3">{studyUploads.map((file,index) => <li key={`${file.name}-${file.size}-${file.lastModified}`} className="flex min-w-0 items-center gap-2 border-b border-blue-100 last:border-0"><FileText className="size-4 shrink-0 text-[#155EEF]" /><span className="min-w-0 flex-1 break-words text-xs" title={file.name}>{file.name}</span><Button type="button" variant="ghost" size="icon" disabled={saving} className="size-11 shrink-0" aria-label={t("移除待上传文档：{0}", {"0":file.name})} onClick={() => setStudyUploads(files => files.filter((_,position) => position !== index))}><X /></Button></li>)}</ul>}
+              {editingChapter && <p className="text-xs leading-5 text-slate-500">{t("本单元格已有 {0} 份学习文档，上传后均会保留。", {"0":editingChapter.assets.filter(asset => asset.kind === "study").length})}</p>}
+            </div>
           </div>
-          <DialogFooter><Button type="button" variant="outline" onClick={() => setUploadDialogOpen(false)}>{t("取消")}</Button><Button type="submit" disabled={saving || !courseId} className="bg-[#155EEF] hover:bg-[#0F4FD6]">{saving ? t("上传中…") : t("保存到矩阵")}</Button></DialogFooter>
+          <DialogFooter><Button type="button" variant="outline" disabled={saving} onClick={() => setUploadDialogOpen(false)}>{t("取消")}</Button><Button type="submit" disabled={saving || !courseId} className="bg-[#155EEF] hover:bg-[#0F4FD6]">{saving ? t("上传中…") : t("保存到矩阵")}</Button></DialogFooter>
         </form></DialogContent>
       </Dialog>
     </main>

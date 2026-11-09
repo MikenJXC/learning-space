@@ -1,5 +1,6 @@
 "use client";
-import { LanguageSwitcher, useT } from "@/lib/i18n";
+import { useT } from "@/lib/i18n";
+import { SettingsLink } from "@/components/settings-link";
 
 import { useMemo, useState } from "react";
 import { ArrowLeft, FolderUp, LoaderCircle } from "lucide-react";
@@ -102,7 +103,7 @@ export function BulkImporter() {
   return (
     <main className="min-h-screen bg-[#f4f7fb] px-5 py-10 text-slate-950">
       <div className="mx-auto max-w-3xl">
-        <div className="mb-5 flex items-center justify-between"><Button asChild variant="ghost"><a href="/"><ArrowLeft />{t("返回课程矩阵")}</a></Button><LanguageSwitcher /></div>
+        <div className="mb-5 flex items-center justify-between"><Button asChild variant="ghost"><a href="/"><ArrowLeft />{t("返回课程矩阵")}</a></Button><SettingsLink /></div>
         <section className="rounded-[28px] border border-slate-200 bg-white p-7 shadow-[0_18px_60px_rgba(15,23,42,.07)] md:p-10">
           <div className="mb-7 grid size-14 place-items-center rounded-2xl bg-blue-50 text-[#155EEF]"><FolderUp className="size-7" /></div>
           <h1 className="text-3xl font-semibold tracking-[-0.04em]">{t("批量导入课件")}</h1>

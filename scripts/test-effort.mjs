@@ -1,0 +1,25 @@
+import assert from 'node:assert/strict';
+import { addActiveInterval, validEffortTicks, effortRangeStart, effortDays, effortStreak, dayKey } from '../lib/study-effort.ts';
+
+const now = Date.UTC(2026, 10, 9, 16, 0, 15), bucket = now - 15000;
+const queue = new Map();
+addActiveInterval(queue, bucket - 500, bucket + 500, 'file');
+assert.deepEqual([...queue.values()].map(t => t.activeMs), [500, 500]);
+addActiveInterval(queue, bucket, bucket + 120000, 'file');
+assert.equal(queue.get(bucket).activeMs, 500, 'Throttled or sleeping timers cannot add a long interval');
+for (let i = 0; i < 20; i++) addActiveInterval(queue, bucket, bucket + 1000, 'file');
+assert.equal(queue.get(bucket).activeMs, 15000, 'A slot cannot exceed wall-clock time');
+const tick = { bucketStart: bucket, activeMs: 10000, assetId: 'file' };
+assert.deepEqual(validEffortTicks([tick], now), [tick]);
+for (const invalid of [[], [tick, tick], [{ ...tick, activeMs: 15001 }], [{ ...tick, bucketStart: bucket + 1 }], [{ ...tick, bucketStart: now + 15000 }], [{ ...tick, bucketStart: now - 615000 }], [{ ...tick, assetId: '' }]]) assert.equal(validEffortTicks(invalid, now), null);
+assert.equal(validEffortTicks([{ ...tick, bucketStart: now, activeMs: 1 }], now), null);
+assert.equal(dayKey(now, 480), '2026-11-10');
+assert.equal(dayKey(now, -480), '2026-11-09');
+assert.equal(new Date(effortRangeStart(now, 7, 480)).toISOString(), '2026-11-03T16:00:00.000Z');
+const daily = effortDays(now, 7, 480, [{ date: '2026-11-08', activeMs: 10000 }, { date: '2026-11-09', activeMs: 20000 }]);
+assert.equal(daily.length, 7);
+assert.equal(daily[0].activeMs, 0);
+assert.equal(effortStreak(daily, '2026-11-10'), 2, 'Today need not be active yet');
+assert.equal(effortStreak(daily, '2026-11-11'), 0);
+assert.equal(effortStreak([{ date: '2026-11-10', activeMs: 9999 }], '2026-11-10'), 0);
+console.log('Effort checks passed: interval limits, slot boundaries, retry validation, timezone midnight, calendar filling and streaks.');

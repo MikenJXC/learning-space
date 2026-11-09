@@ -1,7 +1,7 @@
 import { requireAccountUser } from "@/lib/auth";
-import { AccountCenter } from "./account-center";
+import { redirect } from "next/navigation";
 export const dynamic = "force-dynamic";
 export default async function AccountPage() {
-  const user = await requireAccountUser();
-  return <AccountCenter username={user.username} role={user.role} />;
+  await requireAccountUser();
+  redirect("/settings#account");
 }

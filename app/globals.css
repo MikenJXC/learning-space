@@ -149,6 +149,34 @@ body {
 }
 .study-shell { padding-bottom: env(safe-area-inset-bottom); }
 .study-header { padding-top: max(8px, env(safe-area-inset-top)); }
+.study-docx-renderer .study-docx-wrapper {
+  min-height: 100%;
+  background: #eef2f8 !important;
+  padding: 28px 18px 0 !important;
+}
+.study-docx-renderer .study-docx-wrapper > section.study-docx {
+  max-width: 100%;
+  margin-bottom: 28px !important;
+  box-shadow: 0 16px 45px rgb(19 33 58 / 12%) !important;
+}
+.study-docx-renderer section.study-docx img {
+  max-width: 100%;
+  height: auto;
+}
+.study-docx-renderer section.study-docx article {
+  overflow-wrap: anywhere;
+}
+@media (max-width: 700px) {
+  .study-docx-renderer .study-docx-wrapper {
+    align-items: stretch !important;
+    padding: 0 !important;
+  }
+  .study-docx-renderer .study-docx-wrapper > section.study-docx {
+    min-height: 100%;
+    margin: 0 !important;
+    box-shadow: none !important;
+  }
+}
 @media (max-height: 500px) and (orientation: landscape) {
   .study-header-inner { display: flex; flex-wrap: nowrap; gap: 6px; }
   .study-course-select { width: min(22vw, 240px); }

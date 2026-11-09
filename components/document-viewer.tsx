@@ -12,39 +12,135 @@ import { useWheelPaging } from "@/lib/use-wheel-paging";
 import { downloadUrl } from "@/lib/download-url";
 import { createSlideImage, getSlideFitScale, repairMissingSlideShapes, SLIDE_FRAME_DOCUMENT, SLIDE_WIDTH } from "@/lib/slide-frame";
 import { preparePptxPreview } from "@/lib/pptx-compat";
+import { DOCX_READING_UNITS, docxReadingPosition, docxRestoreFraction } from "@/lib/docx-reading";
 
 export function DocumentViewer({ asset, variant }: { asset: LibraryAsset; variant: "dark" | "light" }) {
   const t = useT();
   const extension = asset.fileName.toLowerCase().split(".").pop();
   if (extension === "pdf") return <PdfViewer key={asset.id} asset={asset} variant={variant} />;
-  if (extension === "docx") return <DocxViewer asset={asset} />;
+  if (extension === "docx") return <DocxViewer key={asset.id} asset={asset} />;
   if (extension === "pptx") return <PptxViewer key={asset.id} asset={asset} />;
   return <Unsupported asset={asset} />;
 }
 
 function DocxViewer({ asset }: { asset: LibraryAsset }) {
   const t = useT();
-  const [html, setHtml] = useState("");
+  const [ready, setReady] = useState(false);
   const [error, setError] = useState("");
+  const readerRef = useRef<HTMLDivElement>(null);
+  const rendererRef = useRef<HTMLDivElement>(null);
+  const [percent, setPercent] = useState(0);
+  const [saveStatus, setSaveStatus] = useState("自动记录阅读位置");
   useEffect(() => {
     let cancelled = false;
+    const renderer = rendererRef.current;
+    if (!renderer) return;
+    renderer.replaceChildren();
+    setReady(false);
+    setError("");
     void (async () => {
       try {
-        const [response, mammoth] = await Promise.all([fetch(asset.url), import("mammoth")]);
+        const [response, docx] = await Promise.all([fetch(asset.url), import("docx-preview")]);
         if (!response.ok) throw new Error(t("文档读取失败"));
-        const result = await mammoth.convertToHtml({ arrayBuffer: await response.arrayBuffer() });
-        if (!cancelled) setHtml(result.value);
+        const data = await response.arrayBuffer();
+        if (cancelled) return;
+        const compact = renderer.clientWidth > 0 && renderer.clientWidth < 720;
+        await docx.renderAsync(data, renderer, renderer, {
+          className: "study-docx",
+          inWrapper: true,
+          ignoreWidth: compact,
+          ignoreHeight: compact,
+          breakPages: !compact,
+          ignoreLastRenderedPageBreak: false,
+          useBase64URL: true,
+          renderHeaders: true,
+          renderFooters: true,
+          renderFootnotes: true,
+          renderEndnotes: true,
+          renderChanges: false,
+          renderComments: false,
+          renderAltChunks: false,
+          debug: false,
+        });
+        if (cancelled) return;
+        renderer.querySelectorAll("script,iframe,object,embed,form,input,button,textarea,select").forEach(node => node.remove());
+        renderer.querySelectorAll<HTMLElement>("*").forEach(node => {
+          for (const attribute of [...node.attributes]) {
+            if (attribute.name.toLowerCase().startsWith("on")) node.removeAttribute(attribute.name);
+          }
+        });
+        renderer.querySelectorAll<HTMLAnchorElement>("a").forEach(link => {
+          link.removeAttribute("href");
+          link.removeAttribute("target");
+          link.removeAttribute("rel");
+        });
+        setReady(true);
       } catch (cause) {
         if (!cancelled) setError(cause instanceof Error ? cause.message : t("文档预览失败"));
       }
     })();
-    return () => { cancelled = true; };
+    return () => { cancelled = true; renderer.replaceChildren(); };
   }, [asset.url]);
 
+  useEffect(() => {
+    if (!ready) return;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let pending: { page: number; totalPages: number; updatedAt: number } | null = null;
+    let lastPage = 0;
+    let sequence = 0;
+    let cancelled = false;
+    let active = false;
+    let animation = 0;
+    const reader = readerRef.current;
+    const renderer = rendererRef.current;
+    if (!reader || !renderer) return;
+    const flush = () => {
+      if (!pending) return;
+      const next = pending; pending = null;
+      const current = ++sequence;
+      setSaveStatus("正在保存阅读位置…");
+      void saveReadingProgress(asset.id, next).then(saved => {
+        if (!cancelled && current === sequence) setSaveStatus(saved ? "阅读位置已保存" : "已在本机记录，云端暂未同步");
+      });
+    };
+    const record = () => {
+      if (!active || cancelled || reader.clientHeight < 1) return;
+      const page = docxReadingPosition(reader.scrollTop, reader.scrollHeight, reader.clientHeight);
+      const totalPages = DOCX_READING_UNITS;
+      if (page === lastPage) return;
+      lastPage = page;
+      setPercent(Math.round((page - 1) / (totalPages - 1) * 100));
+      pending = { page, totalPages, updatedAt: Date.now() };
+      clearTimeout(timer); timer = setTimeout(flush, 400);
+    };
+    const restored = docxRestoreFraction(getReadingProgress(asset));
+    const restore = () => {
+      if (cancelled || reader.clientHeight < 1) return;
+      reader.scrollTop = restored * Math.max(0, reader.scrollHeight - reader.clientHeight);
+      active = true;
+      record();
+    };
+    reader.addEventListener("scroll", record, { passive: true });
+    const observer = new ResizeObserver(() => active ? record() : restore());
+    observer.observe(reader);
+    observer.observe(renderer);
+    void (async () => {
+      await Promise.all([...renderer.querySelectorAll("img")].map(img => img.complete ? Promise.resolve() : new Promise<void>(resolve => { img.onload = () => resolve(); img.onerror = () => resolve(); })));
+      await document.fonts.ready;
+      if (!cancelled) animation = requestAnimationFrame(restore);
+    })();
+    return () => {
+      cancelled = true;
+      reader.removeEventListener("scroll", record);
+      observer.disconnect();
+      cancelAnimationFrame(animation);
+      clearTimeout(timer);
+      if (pending) void saveReadingProgress(asset.id, pending);
+    };
+  }, [ready, asset.id]);
+
   if (error) return <Unsupported asset={asset} message={error} />;
-  if (!html) return <Loading label={t("正在解析 DOCX…")} />;
-  const srcDoc = `<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{margin:0;background:#eef2f8;color:#182033;font:16px/1.8 ui-sans-serif,system-ui}article{box-sizing:border-box;max-width:860px;min-height:100vh;margin:28px auto;padding:64px 72px;background:#fff;box-shadow:0 16px 45px #13213a1c;border-radius:8px;overflow-wrap:anywhere}img{max-width:100%;height:auto}table{border-collapse:collapse;width:100%;display:block;overflow-x:auto}td,th{border:1px solid #d9dee8;padding:8px}h1,h2,h3{line-height:1.3}@media(max-width:700px){article{margin:0;padding:28px 22px;border-radius:0}}</style><article>${html}</article>`;
-  return <iframe title={asset.fileName} sandbox="" srcDoc={srcDoc} className="h-full w-full border-0 bg-[#eef2f8]" />;
+  return <div className="relative flex h-full min-h-0 flex-col"><div ref={readerRef} tabIndex={0} role="document" aria-label={asset.fileName} className="min-h-0 w-full flex-1 overflow-auto overscroll-contain bg-[#eef2f8]"><div ref={rendererRef} className="study-docx-renderer min-h-full" /></div>{!ready && <div className="absolute inset-0 z-10"><Loading label={t("正在解析 DOCX…")} /></div>}<div role="status" className="shrink-0 border-t border-slate-200 bg-white px-3 py-2 text-xs text-slate-500">{t("已阅读 {0}%", {"0":percent})} · {t(saveStatus)}</div></div>;
 }
 
 function PptxViewer({ asset }: { asset: LibraryAsset }) {

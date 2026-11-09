@@ -13,6 +13,7 @@ export function getReadingProgress(asset: LibraryAsset): ReadingProgress | null 
 }
 
 export async function saveReadingProgress(assetId: string, progress: ReadingProgress): Promise<boolean> {
+  window.dispatchEvent(new CustomEvent("learning-reading-ready", { detail: { assetId } }));
   try { localStorage.setItem(prefix + assetId, JSON.stringify(progress)); } catch { /* Optional local backup. */ }
   try {
     const response = await fetch("/api/progress", {

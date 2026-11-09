@@ -7,8 +7,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { AccountActions } from "@/components/account-actions";
 
-export function AccountCenter({ username: initialUsername, role }: { username: string; role: string }) {
+export function AccountCenter({ username: initialUsername, role, embedded = false }: { username: string; role: string; embedded?: boolean }) {
   const t = useT();
+  const Container = embedded ? "div" : "main";
   const [username, setUsername] = useState(initialUsername);
   const [savedUsername, setSavedUsername] = useState(initialUsername);
   const [currentPassword, setCurrentPassword] = useState("");
@@ -30,10 +31,10 @@ export function AccountCenter({ username: initialUsername, role }: { username: s
     } catch (cause) { setError(cause instanceof Error ? cause.message : t("网络异常，请重试")); }
     finally { setBusy(false); }
   }
-  return <main className="min-h-dvh bg-[#f4f7fb] text-slate-950">
-    <header className="border-b border-slate-200 bg-white"><div className="mx-auto flex max-w-5xl items-center justify-between gap-2 px-4 py-3 sm:px-8"><a href="/" className="flex items-center gap-2 font-semibold"><BookOpen className="size-5 text-[#155EEF]" />{t("学习空间")}</a><AccountActions /></div></header>
-    <section className="mx-auto max-w-2xl px-4 py-6 sm:py-12">
-      <a href="/" className="mb-6 inline-flex min-h-11 items-center gap-2 text-sm text-slate-500"><ArrowLeft className="size-4" />{t("返回课程矩阵")}</a>
+  return <Container className={embedded ? "text-slate-950" : "min-h-dvh bg-[#f4f7fb] text-slate-950"}>
+    {!embedded && <header className="border-b border-slate-200 bg-white"><div className="mx-auto flex max-w-5xl items-center justify-between gap-2 px-4 py-3 sm:px-8"><a href="/" className="flex items-center gap-2 font-semibold"><BookOpen className="size-5 text-[#155EEF]" />{t("学习空间")}</a><AccountActions /></div></header>}
+    <section className={embedded ? "" : "mx-auto max-w-2xl px-4 py-6 sm:py-12"}>
+      {!embedded && <a href="/" className="mb-6 inline-flex min-h-11 items-center gap-2 text-sm text-slate-500"><ArrowLeft className="size-4" />{t("返回课程矩阵")}</a>}
       <div className="rounded-[24px] border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
         <div className="mb-7 flex items-center gap-4"><span className="grid size-14 place-items-center rounded-2xl bg-blue-50 text-[#155EEF]"><UserRound className="size-7" /></span><div><h1 className="text-2xl font-semibold">{t("用户中心")}</h1><p className="mt-1 break-all text-sm text-slate-500">{savedUsername} · {role === "owner" ? t("管理员") : t("普通用户")}</p></div></div>
         <form onSubmit={save} className="space-y-5">
@@ -48,5 +49,5 @@ export function AccountCenter({ username: initialUsername, role }: { username: s
         <p className="mt-6 flex items-start gap-2 text-xs leading-5 text-slate-500"><ShieldCheck className="mt-0.5 size-4 shrink-0" />{t("修改账号资料后，其他设备的旧登录会失效；当前设备继续保持登录。")}</p>
       </div>
     </section>
-  </main>;
+  </Container>;
 }

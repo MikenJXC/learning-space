@@ -1,0 +1,1 @@
+ALTER TABLE `courses` ADD `progress_basis` text DEFAULT 'slides' NOT NULL;

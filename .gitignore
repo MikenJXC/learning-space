@@ -58,3 +58,4 @@ next-env.d.ts
 /.upload-runtime/
 /site-deploy-*.tar.gz
 /public/pdf.worker.min.mjs
+.serena/

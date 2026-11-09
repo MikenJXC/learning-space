@@ -21,6 +21,7 @@ export type LibraryChapter = {
 export type LibraryCourse = {
   id: string;
   name: string;
+  progressBasis?: AssetKind;
   chapters: LibraryChapter[];
 };
 

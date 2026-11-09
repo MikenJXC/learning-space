@@ -34,6 +34,7 @@ export async function GET() {
   const result: LibraryCourse[] = courseRows.map((course) => ({
     id: course.id,
     name: course.name,
+    progressBasis: course.progressBasis,
     chapters: chapterRows
       .filter((chapter) => chapter.courseId === course.id)
       .map((chapter) => ({

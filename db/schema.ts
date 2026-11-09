@@ -1,4 +1,4 @@
-import { index, integer, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
+import { index, integer, primaryKey, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
 
 export const accounts = sqliteTable("accounts", {
   id: text("id").primaryKey(),
@@ -29,6 +29,7 @@ export const courses = sqliteTable(
     id: text("id").primaryKey(),
     ownerId: text("owner_id").notNull(),
     name: text("name").notNull(),
+    progressBasis: text("progress_basis", { enum: ["slides", "study"] }).notNull().default("slides"),
     createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
     deletedAt: integer("deleted_at", { mode: "timestamp_ms" }),
   },
@@ -72,3 +73,23 @@ export const assets = sqliteTable(
   },
   (table) => [index("assets_chapter_kind_idx").on(table.chapterId, table.kind)],
 );
+
+// Keep effort history even if a course/file is subsequently removed. Only the
+// owning account is a foreign key; names and chapter numbers are snapshots.
+export const studySessions = sqliteTable("study_sessions", {
+  id: text("id").primaryKey(),
+  accountId: text("account_id").notNull().references(() => accounts.id, { onDelete: "cascade" }),
+  courseId: text("course_id").notNull(),
+  courseName: text("course_name").notNull(),
+  chapterNumber: integer("chapter_number").notNull(),
+  startedAt: integer("started_at").notNull(),
+}, table => [index("study_sessions_account_time_idx").on(table.accountId, table.startedAt)]);
+
+export const studyTicks = sqliteTable("study_ticks", {
+  accountId: text("account_id").notNull().references(() => accounts.id, { onDelete: "cascade" }),
+  bucketStart: integer("bucket_start").notNull(),
+  sessionId: text("session_id").notNull().references(() => studySessions.id, { onDelete: "cascade" }),
+  courseId: text("course_id").notNull(),
+  assetId: text("asset_id").notNull(),
+  activeMs: integer("active_ms").notNull(),
+}, table => [primaryKey({ columns: [table.accountId, table.bucketStart] }), index("study_ticks_session_idx").on(table.sessionId)]);
